@@ -28,13 +28,13 @@
     },
     {
       "matchPackagePrefixes": [
-        "com.github.firemasterk."
+        "com.github.t6fb3m59"
       ],
       "groupName": "Personal Forks",
       "enabled": false
     }
   ],
   "ignoreDeps": [
-    "com.github.FireMasterK.NewPipeExtractor:NewPipeExtractor"
+    "com.github.TeamNewPipe:nanojson"
   ]
 }

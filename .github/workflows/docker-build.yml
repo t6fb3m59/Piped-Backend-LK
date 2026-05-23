@@ -17,13 +17,13 @@ jobs:
     strategy:
       matrix:
         include:
-#          - image: 1337kavin/piped:openj9
+#          - image: logicalkarma/piped:openj9
 #            dockerfile: ./Dockerfile.openj9.ci
-          - image: 1337kavin/piped:hotspot
+          - image: logicalkarma/piped:hotspot
             dockerfile: ./Dockerfile.ci
-          - image: 1337kavin/piped:latest,1337kavin/piped:azul-zulu
+          - image: logicalkarma/piped:latest,logicalkarma/piped:azul-zulu
             dockerfile: ./Dockerfile.azul.ci
-          - image: 1337kavin/piped:graalvm-jvm
+          - image: logicalkarma/piped:graalvm-jvm
             dockerfile: ./Dockerfile.graalvm-jvm.ci
     steps:
       - uses: actions/checkout@v5
