@@ -8,7 +8,7 @@ import java.util.List;
 @NoArgsConstructor
 public class Streams {
 
-    public String title, description, uploadDate, uploader, uploaderUrl, uploaderAvatar, thumbnailUrl, hls, dash,
+    public String title, description, uploadDate, uploader, uploaderUrl, uploaderAvatar, thumbnailUrl,
             lbryId, category, license, visibility;
 
     public List<String> tags;
@@ -18,8 +18,6 @@ public class Streams {
     public boolean uploaderVerified;
 
     public long duration, views, likes, dislikes, uploaderSubscriberCount, uploaded;
-
-    public List<PipedStream> audioStreams, videoStreams;
 
     public List<ContentItem> relatedStreams;
 
@@ -33,12 +31,15 @@ public class Streams {
 
     public List<PreviewFrames> previewFrames;
 
+    public AvailableModes availableModes;
+    public String defaultMode;
+
     public Streams(String title, String description, String uploadDate, long uploaded, String uploader, String uploaderUrl,
                    String uploaderAvatar, String thumbnailUrl, long duration, long views, long likes, long dislikes, long uploaderSubscriberCount,
-                   boolean uploaderVerified, List<PipedStream> audioStreams, List<PipedStream> videoStreams,
-                   List<ContentItem> relatedStreams, List<Subtitle> subtitles, boolean livestream, String hls, String dash,
+                   boolean uploaderVerified, List<ContentItem> relatedStreams, List<Subtitle> subtitles, boolean livestream,
                    String lbryId, String category, String license, String visibility, List<String> tags, List<MetaInfo> metaInfo,
-                   List<ChapterSegment> chapters, List<PreviewFrames> previewFrames) {
+                   List<ChapterSegment> chapters, List<PreviewFrames> previewFrames,
+                   AvailableModes availableModes, String defaultMode) {
         this.title = title;
         this.description = description;
         this.uploadDate = uploadDate;
@@ -53,13 +54,9 @@ public class Streams {
         this.dislikes = dislikes;
         this.uploaderSubscriberCount = uploaderSubscriberCount;
         this.uploaderVerified = uploaderVerified;
-        this.audioStreams = audioStreams;
-        this.videoStreams = videoStreams;
         this.relatedStreams = relatedStreams;
         this.subtitles = subtitles;
         this.livestream = livestream;
-        this.hls = hls;
-        this.dash = dash;
         this.lbryId = lbryId;
         this.chapters = chapters;
         this.previewFrames = previewFrames;
@@ -68,5 +65,7 @@ public class Streams {
         this.tags = tags;
         this.metaInfo = metaInfo;
         this.visibility = visibility;
+        this.availableModes = availableModes;
+        this.defaultMode = defaultMode;
     }
 }
