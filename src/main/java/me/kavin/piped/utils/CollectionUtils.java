@@ -129,6 +129,7 @@ public class CollectionUtils {
 
         final List<SabrFormat> formats = new ArrayList<>(sabrItagItems.size());
         for (ItagItem itag : sabrItagItems) {
+            if (itag.isDrc()) continue;
             formats.add(toSabrFormat(itag, approxDurationMs));
         }
         return new SabrSession(proxiedSessionUrl, ustreamerConfig, formats);
