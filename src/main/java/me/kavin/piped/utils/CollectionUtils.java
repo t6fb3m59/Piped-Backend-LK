@@ -7,10 +7,12 @@ import org.schabi.newpipe.extractor.channel.ChannelInfoItem;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.linkhandler.ReadyChannelTabListLinkHandler;
 import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem;
+import org.schabi.newpipe.extractor.services.youtube.ItagItem;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.extractor.stream.StreamType;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -20,7 +22,9 @@ import static me.kavin.piped.utils.URLUtils.*;
 
 public class CollectionUtils {
 
-    public static Streams collectStreamInfo(StreamInfo info) {
+    public static Streams collectStreamInfo(ExtractedVideo extracted) {
+        final StreamInfo info = extracted.info;
+
         final List<Subtitle> subtitles = new ObjectArrayList<>();
         final List<ChapterSegment> chapters = new ObjectArrayList<>();
 
@@ -75,14 +79,97 @@ public class CollectionUtils {
                 metaInfoItem.getUrls(), metaInfoItem.getUrlTexts()
         )));
 
+        // Build the legacy mode block (may be null only if nothing was extracted at all).
+        final String legacyDash = rewriteVideoURL(info.getDashMpdUrl(), Map.of());
+        final String legacyHls = rewriteVideoURL(info.getHlsUrl(), Map.of());
+        final boolean legacyAvailable = legacyDash != null || legacyHls != null
+                || !audioStreams.isEmpty() || !videoStreams.isEmpty();
+        final LegacyMode legacy = legacyAvailable
+                ? new LegacyMode(legacyDash, legacyHls, audioStreams, videoStreams)
+                : null;
+
+        // Build the SABR mode block when the extractor surfaced a SABR endpoint at the boundary.
+        // Livestreams are force-legacy per architecture decision #17.
+        final SabrSession sabr = (!livestream && extracted.sabrUrl != null && extracted.sabrUstreamerConfig != null)
+                ? buildSabrSession(extracted.sabrUrl, extracted.sabrUstreamerConfig,
+                                   extracted.sabrFormats, info)
+                : null;
+
+        final AvailableModes availableModes = new AvailableModes(legacy, sabr);
+        final String defaultMode = sabr != null ? "sabr" : "legacy";
+
         return new Streams(info.getName(), info.getDescription().getContent(),
                 info.getTextualUploadDate(), info.getUploadDate() != null ? info.getUploadDate().offsetDateTime().toInstant().toEpochMilli() : -1,
                 info.getUploaderName(), substringYouTube(info.getUploaderUrl()), getLastThumbnail(info.getUploaderAvatars()),
                 getLastThumbnail(info.getThumbnails()), info.getDuration(), info.getViewCount(), info.getLikeCount(), info.getDislikeCount(),
                 info.getUploaderSubscriberCount(), info.isUploaderVerified(),
-                audioStreams, videoStreams, relatedStreams, subtitles, livestream, rewriteVideoURL(info.getHlsUrl(), Map.of()),
-                rewriteVideoURL(info.getDashMpdUrl(), Map.of()), null, info.getCategory(), info.getLicence(),
-                info.getPrivacy().name().toLowerCase(), info.getTags(), metaInfo, chapters, previewFrames);
+                relatedStreams, subtitles, livestream, null, info.getCategory(), info.getLicence(),
+                info.getPrivacy().name().toLowerCase(), info.getTags(), metaInfo, chapters, previewFrames,
+                availableModes, defaultMode);
+    }
+
+    /**
+     * Inject an LBRY-sourced {@link PipedStream} at the front of the legacy
+     * mode's videoStreams list. Creates the legacy block on demand if a video
+     * happens to have no legacy data at all (rare; usually SABR-only videos
+     * still expose at least the legacy progressive itag 18).
+     */
+    public static void prependLegacyVideoStream(Streams streams, PipedStream entry) {
+        if (streams.availableModes == null) {
+            streams.availableModes = new AvailableModes(null, null);
+        }
+        if (streams.availableModes.legacy == null) {
+            streams.availableModes.legacy = new LegacyMode(null, null,
+                    new ObjectArrayList<>(), new ObjectArrayList<>());
+        }
+        streams.availableModes.legacy.videoStreams.add(0, entry);
+    }
+
+    /**
+     * Build the SABR session block from already-picked SABR endpoint + ustreamer config
+     * and the per-format metadata list sourced from NPE's SABR-aware extractor getters
+     * (see {@code YoutubeStreamExtractor.getAndroidSabrAvailableFormats()}).
+     *
+     * <p>The {@code info} parameter supplies the overall video duration used as
+     * {@code approxDurationMs} for every format (LuanRT's {@code SabrFormat} expects
+     * per-format duration, but for VODs all formats span the full video).</p>
+     */
+    private static SabrSession buildSabrSession(String sabrUrl,
+                                                String ustreamerConfig,
+                                                List<ItagItem> sabrItagItems,
+                                                StreamInfo info) {
+        final String proxiedSessionUrl = rewriteVideoURL(sabrUrl, Map.of());
+
+        final long approxDurationMs = info.getDuration() > 0 ? info.getDuration() * 1000L : 0L;
+
+        final List<SabrFormat> formats = new ArrayList<>(sabrItagItems.size());
+        for (ItagItem itag : sabrItagItems) {
+            formats.add(toSabrFormat(itag, approxDurationMs));
+        }
+        return new SabrSession(proxiedSessionUrl, ustreamerConfig, formats);
+    }
+
+    private static SabrFormat toSabrFormat(ItagItem itagItem, long approxDurationMs) {
+        final String lastModified = itagItem.getLastModified() > 0
+                ? String.valueOf(itagItem.getLastModified())
+                : null;
+        final Integer width = itagItem.getWidth() > 0 ? itagItem.getWidth() : null;
+        final Integer height = itagItem.getHeight() > 0 ? itagItem.getHeight() : null;
+        final Boolean isDrc = itagItem.isDrc() ? Boolean.TRUE : null;
+
+        // Reconstruct the full mimeType with codecs="..." so Shaka can use it directly
+        // in DASH Representation@codecs (LuanRT's wrapper MPD generator needs this).
+        String mimeType = itagItem.getMediaFormat() != null
+                ? itagItem.getMediaFormat().getMimeType()
+                : null;
+        final String codec = itagItem.getCodec();
+        if (mimeType != null && codec != null && !codec.isEmpty()) {
+            mimeType = mimeType + "; codecs=\"" + codec + "\"";
+        }
+
+        return new SabrFormat(itagItem.id, lastModified, itagItem.getXtags(),
+                itagItem.getBitrate(), approxDurationMs, mimeType,
+                width, height, itagItem.getAudioTrackId(), isDrc);
     }
 
     public static List<ContentItem> collectRelatedItems(List<? extends InfoItem> items) {

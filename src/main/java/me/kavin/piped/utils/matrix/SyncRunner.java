@@ -140,9 +140,9 @@ public class SyncRunner implements Runnable {
                                             // We're capable of helping another instance!
                                             Multithreading.runAsync(() -> {
                                                 try {
-                                                    StreamInfo info = StreamInfo.getInfo("https://www.youtube.com/watch?v=" + bypassRequest.getVideoId());
+                                                    ExtractedVideo extracted = ExtractedVideo.extract("https://www.youtube.com/watch?v=" + bypassRequest.getVideoId());
 
-                                                    Streams streams = CollectionUtils.collectStreamInfo(info);
+                                                    Streams streams = CollectionUtils.collectStreamInfo(extracted);
 
                                                     FederatedGeoBypassResponse bypassResponse = new FederatedGeoBypassResponse(bypassRequest.getVideoId(), Constants.YOUTUBE_COUNTRY, streams);
 

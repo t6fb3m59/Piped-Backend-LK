@@ -51,7 +51,7 @@ public class StreamHandlers {
             Sentry.setExtra("videoId", videoId);
             ITransaction transaction = Sentry.startTransaction("StreamInfo fetch", "fetch");
             try {
-                return StreamInfo.getInfo("https://www.youtube.com/watch?v=" + videoId);
+                return ExtractedVideo.extract("https://www.youtube.com/watch?v=" + videoId);
             } catch (Exception e) {
                 if (e instanceof GeographicRestrictionException) {
                     return null;
@@ -125,11 +125,11 @@ public class StreamHandlers {
             return null;
         });
 
-        StreamInfo info = null;
+        ExtractedVideo extracted = null;
         Throwable exception = null;
 
         try {
-            info = futureStream.get(10, TimeUnit.SECONDS);
+            extracted = futureStream.get(10, TimeUnit.SECONDS);
         } catch (ExecutionException e) {
             exception = e.getCause();
             if (
@@ -141,7 +141,7 @@ public class StreamHandlers {
             }
         }
 
-        if (info == null) {
+        if (extracted == null) {
             // We might be geo restricted
 
             if (Constants.MATRIX_TOKEN != null && Constants.GEO_RESTRICTION_CHECKER_URL != null) {
@@ -213,7 +213,8 @@ public class StreamHandlers {
                 }
 
                 if (lbryURL != null)
-                    streams.videoStreams.add(0, new PipedStream(-1, lbryURL, "MP4", "LBRY", "video/mp4", false, -1));
+                    CollectionUtils.prependLegacyVideoStream(streams,
+                            new PipedStream(-1, lbryURL, "MP4", "LBRY", "video/mp4", false, -1));
 
                 // Attempt to get dislikes calculating with the RYD API rating
                 if (streams.dislikes < 0 && streams.likes >= 0) {
@@ -240,7 +241,8 @@ public class StreamHandlers {
                 throw (Exception) exception;
         }
 
-        Streams streams = CollectionUtils.collectStreamInfo(info);
+        Streams streams = CollectionUtils.collectStreamInfo(extracted);
+        StreamInfo info = extracted.info;
 
         String lbryURL = null;
 
@@ -259,10 +261,12 @@ public class StreamHandlers {
         }
 
         if (lbryHlsURL != null)
-            streams.videoStreams.add(0, new PipedStream(-1, lbryHlsURL, "HLS", "LBRY HLS", "application/x-mpegurl", false, -1));
+            CollectionUtils.prependLegacyVideoStream(streams,
+                    new PipedStream(-1, lbryHlsURL, "HLS", "LBRY HLS", "application/x-mpegurl", false, -1));
 
         if (lbryURL != null)
-            streams.videoStreams.add(0, new PipedStream(-1, lbryURL, "MP4", "LBRY", "video/mp4", false, -1));
+            CollectionUtils.prependLegacyVideoStream(streams,
+                    new PipedStream(-1, lbryURL, "MP4", "LBRY", "video/mp4", false, -1));
 
         long time = info.getUploadDate() != null ? info.getUploadDate().offsetDateTime().toInstant().toEpochMilli()
                 : System.currentTimeMillis();
