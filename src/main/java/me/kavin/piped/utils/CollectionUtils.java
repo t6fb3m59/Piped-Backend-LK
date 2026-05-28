@@ -8,6 +8,7 @@ import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.linkhandler.ReadyChannelTabListLinkHandler;
 import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem;
 import org.schabi.newpipe.extractor.services.youtube.ItagItem;
+import org.schabi.newpipe.extractor.stream.AudioTrackType;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.extractor.stream.StreamType;
@@ -92,7 +93,7 @@ public class CollectionUtils {
         // Livestreams are force-legacy per architecture decision #17.
         final SabrSession sabr = (!livestream && extracted.sabrUrl != null && extracted.sabrUstreamerConfig != null)
                 ? buildSabrSession(extracted.sabrUrl, extracted.sabrUstreamerConfig,
-                                   extracted.sabrFormats, info)
+                                   extracted.sabrCpn, extracted.sabrFormats)
                 : null;
 
         final AvailableModes availableModes = new AvailableModes(legacy, sabr);
@@ -121,30 +122,36 @@ public class CollectionUtils {
 
     private static SabrSession buildSabrSession(String sabrUrl,
                                                 String ustreamerConfig,
-                                                List<ItagItem> sabrItagItems,
-                                                StreamInfo info) {
-        final String proxiedSessionUrl = rewriteVideoURL(sabrUrl, Map.of());
-
-        final long approxDurationMs = info.getDuration() > 0 ? info.getDuration() * 1000L : 0L;
+                                                String cpn,
+                                                List<ItagItem> sabrItagItems) {
+        // Bake alr=yes + cpn into the URL before signing so the qhash covers both.
+        // Otherwise the frontend's per-request URL mutation would invalidate the
+        // qhash and the proxy would 401 every SABR POST.
+        String urlWithExtras = sabrUrl;
+        if (cpn != null && !cpn.isEmpty()) {
+            final char sep = urlWithExtras.contains("?") ? '&' : '?';
+            urlWithExtras = urlWithExtras + sep + "alr=yes&cpn=" + cpn;
+        }
+        final String proxiedSessionUrl = rewriteVideoURL(urlWithExtras, Map.of());
 
         final List<SabrFormat> formats = new ArrayList<>(sabrItagItems.size());
         for (ItagItem itag : sabrItagItems) {
-            if (itag.isDrc()) continue;
-            formats.add(toSabrFormat(itag, approxDurationMs));
+            formats.add(toSabrFormat(itag));
         }
-        return new SabrSession(proxiedSessionUrl, ustreamerConfig, formats);
+        return new SabrSession(proxiedSessionUrl, ustreamerConfig, cpn, formats);
     }
 
-    private static SabrFormat toSabrFormat(ItagItem itagItem, long approxDurationMs) {
-        final String lastModified = itagItem.getLastModified() > 0
+    private static SabrFormat toSabrFormat(ItagItem itagItem) {
+        final SabrFormat f = new SabrFormat();
+        f.itag = itagItem.id;
+        f.lastModified = itagItem.getLastModified() > 0
                 ? String.valueOf(itagItem.getLastModified())
                 : null;
-        final Integer width = itagItem.getWidth() > 0 ? itagItem.getWidth() : null;
-        final Integer height = itagItem.getHeight() > 0 ? itagItem.getHeight() : null;
-        final Boolean isDrc = itagItem.isDrc() ? Boolean.TRUE : null;
+        f.xtags = itagItem.getXtags();
+        f.bitrate = itagItem.getBitrate();
 
-        // Reconstruct the full mimeType with codecs="..." so Shaka can use it directly
-        // in DASH Representation@codecs (LuanRT's wrapper MPD generator needs this).
+        // Reconstruct the full mimeType with codecs="..." so SabrManifestParser
+        // can extract both fields directly.
         String mimeType = itagItem.getMediaFormat() != null
                 ? itagItem.getMediaFormat().getMimeType()
                 : null;
@@ -152,10 +159,56 @@ public class CollectionUtils {
         if (mimeType != null && codec != null && !codec.isEmpty()) {
             mimeType = mimeType + "; codecs=\"" + codec + "\"";
         }
+        f.mimeType = mimeType;
+        f.approxDurationMs = itagItem.getApproxDurationMs() > 0 ? itagItem.getApproxDurationMs() : null;
 
-        return new SabrFormat(itagItem.id, lastModified, itagItem.getXtags(),
-                itagItem.getBitrate(), approxDurationMs, mimeType,
-                width, height, itagItem.getAudioTrackId(), isDrc);
+        if (itagItem.getInitStart() >= 0 && itagItem.getInitEnd() > 0) {
+            f.initRange = new SabrFormat.Range(itagItem.getInitStart(), itagItem.getInitEnd());
+        }
+        if (itagItem.getIndexStart() >= 0 && itagItem.getIndexEnd() > 0) {
+            f.indexRange = new SabrFormat.Range(itagItem.getIndexStart(), itagItem.getIndexEnd());
+        }
+
+        f.width = itagItem.getWidth() > 0 ? itagItem.getWidth() : null;
+        f.height = itagItem.getHeight() > 0 ? itagItem.getHeight() : null;
+        f.frameRate = itagItem.getFps() > 0 ? itagItem.getFps() : null;
+        f.quality = itagItem.getQuality();
+
+        if (itagItem.getAudioLocale() != null) {
+            f.language = itagItem.getAudioLocale().toLanguageTag();
+        }
+        f.audioSampleRate = itagItem.getSampleRate() > 0 ? itagItem.getSampleRate() : null;
+        f.audioChannels = itagItem.getAudioChannels() > 0 ? itagItem.getAudioChannels() : null;
+        f.audioTrackId = itagItem.getAudioTrackId();
+        f.label = itagItem.getAudioTrackName();
+
+        f.isDrc = itagItem.isDrc() ? Boolean.TRUE : null;
+        final AudioTrackType trackType = itagItem.getAudioTrackType();
+        if (trackType != null) {
+            switch (trackType) {
+                case ORIGINAL:
+                    f.isOriginal = Boolean.TRUE;
+                    break;
+                case DUBBED:
+                    f.isDubbed = Boolean.TRUE;
+                    break;
+                case DESCRIPTIVE:
+                    f.isDescriptive = Boolean.TRUE;
+                    break;
+                case SECONDARY:
+                    f.isSecondary = Boolean.TRUE;
+                    break;
+            }
+        } else if (itagItem.itagType == ItagItem.ItagType.AUDIO && !itagItem.isDrc()) {
+            // Single-track audio (no audioTrackType means YouTube didn't expose
+            // multi-language info). Default to "original" so the frontend's
+            // SabrManifestParser tags it with role 'main'; its bandwidth-pick
+            // fallback in SabrSchemePlugin requires at least one variant with
+            // the 'main' role to exist.
+            f.isOriginal = Boolean.TRUE;
+        }
+
+        return f;
     }
 
     public static List<ContentItem> collectRelatedItems(List<? extends InfoItem> items) {

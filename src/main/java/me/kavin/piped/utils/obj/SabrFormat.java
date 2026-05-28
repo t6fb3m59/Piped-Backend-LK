@@ -11,26 +11,44 @@ public class SabrFormat {
     public String lastModified;
     public String xtags;
     public int bitrate;
-    public long approxDurationMs;
     public String mimeType;
+    public Long approxDurationMs;
+
+    public Range initRange;
+    public Range indexRange;
+
     public Integer width;
     public Integer height;
-    public String audioTrackId;
-    public Boolean isDrc;
+    public Integer frameRate;
+    public String quality;
 
-    public SabrFormat(int itag, String lastModified, String xtags, int bitrate,
-                      long approxDurationMs, String mimeType,
-                      Integer width, Integer height,
-                      String audioTrackId, Boolean isDrc) {
-        this.itag = itag;
-        this.lastModified = lastModified;
-        this.xtags = xtags;
-        this.bitrate = bitrate;
-        this.approxDurationMs = approxDurationMs;
-        this.mimeType = mimeType;
-        this.width = width;
-        this.height = height;
-        this.audioTrackId = audioTrackId;
-        this.isDrc = isDrc;
+    public String language;
+    public Integer audioSampleRate;
+    public Integer audioChannels;
+    public String audioTrackId;
+    public String label;
+
+    public Boolean isDrc;
+    public Boolean isVoiceBoost;
+    public Boolean isOriginal;
+    public Boolean isDubbed;
+    public Boolean isAutoDubbed;
+    public Boolean isDescriptive;
+    public Boolean isSecondary;
+    public Boolean spatialAudio;
+
+    public String colorTransferCharacteristics;
+    public String colorPrimaries;
+
+    public static class Range {
+        public int start;
+        public int end;
+
+        public Range() {}
+
+        public Range(int start, int end) {
+            this.start = start;
+            this.end = end;
+        }
     }
 }
