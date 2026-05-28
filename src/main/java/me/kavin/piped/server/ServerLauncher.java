@@ -115,6 +115,14 @@ public class ServerLauncher extends MultithreadedHttpServerLauncher {
                     } catch (Exception e) {
                         return getErrorResponse(e, request.getPath());
                     }
+                })).map(GET, "/sabr/redirect", AsyncServlet.ofBlocking(executor, request -> {
+                    try {
+                        return getRawResponse(URLUtils.resolveSabrRedirect(
+                                request.getQueryParameter("url"), request.getQueryParameter("cpn")).getBytes(UTF_8),
+                                "text/plain", "private, no-store");
+                    } catch (Exception e) {
+                        return getErrorResponse(e, request.getPath());
+                    }
                 })).map(GET, "/clips/:clipId", AsyncServlet.ofBlocking(executor, request -> {
                     try {
                         return getJsonResponse(StreamHandlers.resolveClipId(request.getPathParameter("clipId")),
