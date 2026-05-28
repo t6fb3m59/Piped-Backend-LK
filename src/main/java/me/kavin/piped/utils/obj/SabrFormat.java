@@ -4,12 +4,11 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.NoArgsConstructor;
 
 /**
- * Per-format SABR metadata, mirroring LuanRT googlevideo's {@code SabrFormat} TypeScript
- * interface so the JSON serialisation can be handed straight to
- * {@code SabrStreamingAdapter.setServerAbrFormats(...)} on the frontend.
+ * Per-format SABR metadata, shaped to match the FreeTube SabrManifest format
+ * (see https://github.com/FreeTubeApp/FreeTube/blob/development/src/renderer/helpers/player/SabrManifestParser.js).
+ * The frontend hands this directly to its vendored {@code SabrManifestParser}.
  *
- * <p>Field names use camelCase to match LuanRT's interface — Jackson serialises them
- * as-is.</p>
+ * <p>Field names use camelCase to match FreeTube's TS interface — Jackson serialises them as-is.</p>
  */
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -19,26 +18,44 @@ public class SabrFormat {
     public String lastModified;
     public String xtags;
     public int bitrate;
-    public long approxDurationMs;
     public String mimeType;
+    public Long approxDurationMs;
+
+    public Range initRange;
+    public Range indexRange;
+
     public Integer width;
     public Integer height;
-    public String audioTrackId;
-    public Boolean isDrc;
+    public Integer frameRate;
+    public String quality;
 
-    public SabrFormat(int itag, String lastModified, String xtags, int bitrate,
-                      long approxDurationMs, String mimeType,
-                      Integer width, Integer height,
-                      String audioTrackId, Boolean isDrc) {
-        this.itag = itag;
-        this.lastModified = lastModified;
-        this.xtags = xtags;
-        this.bitrate = bitrate;
-        this.approxDurationMs = approxDurationMs;
-        this.mimeType = mimeType;
-        this.width = width;
-        this.height = height;
-        this.audioTrackId = audioTrackId;
-        this.isDrc = isDrc;
+    public String language;
+    public Integer audioSampleRate;
+    public Integer audioChannels;
+    public String audioTrackId;
+    public String label;
+
+    public Boolean isDrc;
+    public Boolean isVoiceBoost;
+    public Boolean isOriginal;
+    public Boolean isDubbed;
+    public Boolean isAutoDubbed;
+    public Boolean isDescriptive;
+    public Boolean isSecondary;
+    public Boolean spatialAudio;
+
+    public String colorTransferCharacteristics;
+    public String colorPrimaries;
+
+    public static class Range {
+        public int start;
+        public int end;
+
+        public Range() {}
+
+        public Range(int start, int end) {
+            this.start = start;
+            this.end = end;
+        }
     }
 }
