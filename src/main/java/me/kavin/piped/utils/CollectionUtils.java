@@ -124,15 +124,7 @@ public class CollectionUtils {
                                                 String ustreamerConfig,
                                                 String cpn,
                                                 List<ItagItem> sabrItagItems) {
-        // Bake alr=yes + cpn into the URL before signing so the qhash covers both.
-        // Otherwise the frontend's per-request URL mutation would invalidate the
-        // qhash and the proxy would 401 every SABR POST.
-        String urlWithExtras = sabrUrl;
-        if (cpn != null && !cpn.isEmpty()) {
-            final char sep = urlWithExtras.contains("?") ? '&' : '?';
-            urlWithExtras = urlWithExtras + sep + "alr=yes&cpn=" + cpn;
-        }
-        final String proxiedSessionUrl = rewriteVideoURL(urlWithExtras, Map.of());
+        final String proxiedSessionUrl = signSabrUrl(sabrUrl, cpn);
 
         final List<SabrFormat> formats = new ArrayList<>(sabrItagItems.size());
         for (ItagItem itag : sabrItagItems) {

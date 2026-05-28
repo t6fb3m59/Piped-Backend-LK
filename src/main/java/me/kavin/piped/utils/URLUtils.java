@@ -154,4 +154,44 @@ public class URLUtils {
         return newUrl;
 
     }
+
+    public static String signSabrUrl(final String sabrUrl, final String cpn) {
+        final Map<String, String> params = sabrQueryParams(sabrUrl);
+        final StringBuilder prepared = new StringBuilder(sabrUrl);
+        if (!params.containsKey("alr"))
+            prepared.append(sabrUrl.indexOf('?') >= 0 ? "&alr=yes" : "?alr=yes");
+        if (cpn != null && !cpn.isEmpty() && !params.containsKey("cpn"))
+            prepared.append("&cpn=").append(cpn);
+        return rewriteVideoURL(prepared.toString(), Map.of());
+    }
+
+    public static String resolveSabrRedirect(final String rawUrl, final String cpn) throws MalformedURLException {
+        if (StringUtils.isEmpty(rawUrl))
+            throw new IllegalArgumentException("Missing url parameter");
+        final URL parsed = new URL(rawUrl);
+        if (!parsed.getHost().endsWith(".googlevideo.com"))
+            throw new IllegalArgumentException("URL host is not googlevideo");
+        if (!"/videoplayback".equals(parsed.getPath()))
+            throw new IllegalArgumentException("URL is not a videoplayback request");
+        final Map<String, String> params = sabrQueryParams(rawUrl);
+        if (!"1".equals(params.get("sabr")))
+            throw new IllegalArgumentException("Not a SABR URL");
+        if (!params.containsKey("expire"))
+            throw new IllegalArgumentException("URL is not time-limited");
+        return signSabrUrl(rawUrl, cpn);
+    }
+
+    private static Map<String, String> sabrQueryParams(final String url) {
+        final Map<String, String> params = new HashMap<>();
+        final int q = url.indexOf('?');
+        if (q >= 0)
+            for (String pair : url.substring(q + 1).split("&")) {
+                final int eq = pair.indexOf('=');
+                if (eq > 0)
+                    params.put(pair.substring(0, eq), eq + 1 < pair.length() ? pair.substring(eq + 1) : "");
+                else if (!pair.isEmpty())
+                    params.put(pair, "");
+            }
+        return params;
+    }
 }
