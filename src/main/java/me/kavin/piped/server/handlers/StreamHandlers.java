@@ -43,7 +43,7 @@ import static org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper
 import static org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.prepareDesktopJsonBuilder;
 
 public class StreamHandlers {
-    public static byte[] streamsResponse(String videoId) throws Exception {
+    public static byte[] streamsResponse(String videoId, int shape) throws Exception {
 
         Sentry.setExtra("videoId", videoId);
 
@@ -164,7 +164,8 @@ public class StreamHandlers {
                 if (allowedCountries.isEmpty())
                     throw new GeographicRestrictionException("Federated bypass failed, video not available in any region");
 
-                MatrixHelper.sendEvent("video.piped.stream.bypass.request", new FederatedGeoBypassRequest(videoId, allowedCountries));
+                MatrixHelper.sendEvent("video.piped.stream.bypass.request",
+                        new FederatedGeoBypassRequest(videoId, allowedCountries, shape));
 
                 var listener = new WaitingListener(10_000);
                 GeoRestrictionBypassHelper.makeRequest(videoId, listener);
@@ -241,7 +242,7 @@ public class StreamHandlers {
                 throw (Exception) exception;
         }
 
-        Streams streams = CollectionUtils.collectStreamInfo(extracted);
+        Streams streams = CollectionUtils.collectStreamInfo(extracted, shape);
         StreamInfo info = extracted.info;
 
         String lbryURL = null;

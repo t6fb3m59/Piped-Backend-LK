@@ -24,6 +24,10 @@ import static me.kavin.piped.utils.URLUtils.*;
 public class CollectionUtils {
 
     public static Streams collectStreamInfo(ExtractedVideo extracted) {
+        return collectStreamInfo(extracted, Streams.SHAPE_LEGACY);
+    }
+
+    public static Streams collectStreamInfo(ExtractedVideo extracted, int shape) {
         final StreamInfo info = extracted.info;
 
         final List<Subtitle> subtitles = new ObjectArrayList<>();
@@ -80,38 +84,46 @@ public class CollectionUtils {
                 metaInfoItem.getUrls(), metaInfoItem.getUrlTexts()
         )));
 
-        // Build the legacy mode block (may be null only if nothing was extracted at all).
+        // Legacy playback data is always computed (used by both response shapes).
         final String legacyDash = rewriteVideoURL(info.getDashMpdUrl(), Map.of());
         final String legacyHls = rewriteVideoURL(info.getHlsUrl(), Map.of());
         final boolean legacyAvailable = legacyDash != null || legacyHls != null
                 || !audioStreams.isEmpty() || !videoStreams.isEmpty();
-        final LegacyMode legacy = legacyAvailable
-                ? new LegacyMode(legacyDash, legacyHls, audioStreams, videoStreams)
-                : null;
 
-        // Build the SABR mode block when the extractor surfaced a SABR endpoint at the boundary.
-        // Livestreams are force-legacy per architecture decision #17.
-        final SabrSession sabr = (!livestream && extracted.sabrUrl != null && extracted.sabrUstreamerConfig != null)
-                ? buildSabrSession(extracted.sabrUrl, extracted.sabrUstreamerConfig,
-                                   extracted.sabrCpn, extracted.sabrFormats)
-                : null;
-
-        final AvailableModes availableModes = new AvailableModes(legacy, sabr);
-        final String defaultMode = sabr != null ? "sabr" : "legacy";
-
-        return new Streams(info.getName(), info.getDescription().getContent(),
+        final Streams streams = new Streams(info.getName(), info.getDescription().getContent(),
                 info.getTextualUploadDate(), info.getUploadDate() != null ? info.getUploadDate().offsetDateTime().toInstant().toEpochMilli() : -1,
                 info.getUploaderName(), substringYouTube(info.getUploaderUrl()), getLastThumbnail(info.getUploaderAvatars()),
                 getLastThumbnail(info.getThumbnails()), info.getDuration(), info.getViewCount(), info.getLikeCount(), info.getDislikeCount(),
                 info.getUploaderSubscriberCount(), info.isUploaderVerified(),
                 relatedStreams, subtitles, livestream, null, info.getCategory(), info.getLicence(),
                 info.getPrivacy().name().toLowerCase(), info.getTags(), metaInfo, chapters, previewFrames,
-                availableModes, defaultMode);
+                null, null);
+
+        if (shape == Streams.SHAPE_MODE) {
+            final SabrSession sabr = (!livestream && extracted.sabrUrl != null && extracted.sabrUstreamerConfig != null)
+                    ? buildSabrSession(extracted.sabrUrl, extracted.sabrUstreamerConfig,
+                                       extracted.sabrCpn, extracted.sabrFormats)
+                    : null;
+            final LegacyMode legacy = legacyAvailable
+                    ? new LegacyMode(legacyDash, legacyHls, audioStreams, videoStreams)
+                    : null;
+            streams.availableModes = new AvailableModes(legacy, sabr);
+            streams.defaultMode = sabr != null ? "sabr" : "legacy";
+        } else {
+            // @JsonInclude(NON_NULL) keeps availableModes/defaultMode out of the JSON.
+            streams.dash = legacyDash;
+            streams.hls = legacyHls;
+            streams.audioStreams = audioStreams;
+            streams.videoStreams = videoStreams;
+        }
+
+        return streams;
     }
 
     public static void prependLegacyVideoStream(Streams streams, PipedStream entry) {
         if (streams.availableModes == null) {
-            streams.availableModes = new AvailableModes(null, null);
+            streams.videoStreams.add(0, entry);
+            return;
         }
         if (streams.availableModes.legacy == null) {
             streams.availableModes.legacy = new LegacyMode(null, null,

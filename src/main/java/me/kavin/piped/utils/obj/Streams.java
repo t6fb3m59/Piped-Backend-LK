@@ -1,12 +1,17 @@
 package me.kavin.piped.utils.obj;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.NoArgsConstructor;
 import me.kavin.piped.consts.Constants;
 
 import java.util.List;
 
 @NoArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class Streams {
+
+    public static final int SHAPE_LEGACY = 1;
+    public static final int SHAPE_MODE = 2;
 
     public String title, description, uploadDate, uploader, uploaderUrl, uploaderAvatar, thumbnailUrl,
             lbryId, category, license, visibility;
@@ -31,6 +36,8 @@ public class Streams {
 
     public List<PreviewFrames> previewFrames;
 
+    public String dash, hls;
+    public List<PipedStream> audioStreams, videoStreams;
     public AvailableModes availableModes;
     public String defaultMode;
 

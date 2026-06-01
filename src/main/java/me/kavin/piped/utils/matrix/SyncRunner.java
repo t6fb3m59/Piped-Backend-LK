@@ -142,7 +142,7 @@ public class SyncRunner implements Runnable {
                                                 try {
                                                     ExtractedVideo extracted = ExtractedVideo.extract("https://www.youtube.com/watch?v=" + bypassRequest.getVideoId());
 
-                                                    Streams streams = CollectionUtils.collectStreamInfo(extracted);
+                                                    Streams streams = CollectionUtils.collectStreamInfo(extracted, bypassRequest.getShape());
 
                                                     FederatedGeoBypassResponse bypassResponse = new FederatedGeoBypassResponse(bypassRequest.getVideoId(), Constants.YOUTUBE_COUNTRY, streams);
 

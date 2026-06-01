@@ -10,6 +10,7 @@ import io.activej.inject.module.Module;
 import io.activej.launchers.http.MultithreadedHttpServerLauncher;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import me.kavin.piped.consts.Constants;
+import me.kavin.piped.utils.obj.Streams;
 import me.kavin.piped.server.handlers.*;
 import me.kavin.piped.server.handlers.auth.AuthPlaylistHandlers;
 import me.kavin.piped.server.handlers.auth.FeedHandlers;
@@ -110,7 +111,14 @@ public class ServerLauncher extends MultithreadedHttpServerLauncher {
                     }
                 })).map(GET, "/streams/:videoId", AsyncServlet.ofBlocking(executor, request -> {
                     try {
-                        return getJsonResponse(StreamHandlers.streamsResponse(request.getPathParameter("videoId")),
+                        int shape;
+                        try {
+                            shape = Integer.parseInt(request.getQueryParameter("shape"));
+                        } catch (NumberFormatException ignored) {
+                            shape = Streams.SHAPE_LEGACY;
+                        }
+                        return getJsonResponse(
+                                StreamHandlers.streamsResponse(request.getPathParameter("videoId"), shape),
                                 "public, s-maxage=21540, max-age=30", true);
                     } catch (Exception e) {
                         return getErrorResponse(e, request.getPath());

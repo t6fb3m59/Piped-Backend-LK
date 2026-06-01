@@ -12,4 +12,5 @@ import java.util.List;
 public class FederatedGeoBypassRequest {
     private String videoId;
     private List<String> allowedCountries;
+    private int shape;
 }
