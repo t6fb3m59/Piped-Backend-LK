@@ -124,10 +124,11 @@ public class ChannelHelpers {
                         .stream()
                         .filter(StreamInfoItem.class::isInstance)
                         .map(StreamInfoItem.class::cast).forEach(item -> {
-                            long time = item.getUploadDate() != null
-                                    ? item.getUploadDate().offsetDateTime().toInstant().toEpochMilli()
+                            var uploadDate = item.getUploadDate();
+                            long timeForRetention = uploadDate != null
+                                    ? uploadDate.offsetDateTime().toInstant().toEpochMilli()
                                     : System.currentTimeMillis();
-                            if (System.currentTimeMillis() - time < TimeUnit.DAYS.toMillis(Constants.FEED_RETENTION))
+                            if (System.currentTimeMillis() - timeForRetention < TimeUnit.DAYS.toMillis(Constants.FEED_RETENTION))
                                 try {
                                     String id = YOUTUBE_SERVICE.getStreamLHFactory().getId(item.getUrl());
                                     var video = videos.stream()
@@ -136,7 +137,8 @@ public class ChannelHelpers {
                                     if (video.isPresent()) {
                                         VideoHelpers.updateVideo(id, item);
                                     } else {
-                                        VideoHelpers.handleNewVideo("https://youtube.com/watch?v=" + id, time, channel);
+                                        VideoHelpers.handleNewVideo("https://youtube.com/watch?v=" + id,
+                                                uploadDate != null ? timeForRetention : -1L, channel);
                                     }
                                 } catch (Exception e) {
                                     ExceptionHandler.handle(e);
