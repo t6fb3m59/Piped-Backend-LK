@@ -147,11 +147,29 @@ public class ChannelHelpers {
     }
 
     public static ChannelTabInfo videosTabInfo(ChannelInfo info) throws ExtractionException, IOException {
-        var preloadedVideosTab = collectPreloadedTabs(info.getTabs())
+        return tabInfo(info, ChannelTabs.VIDEOS);
+    }
+
+    public static ChannelTabInfo shortsTabInfo(ChannelInfo info) throws ExtractionException, IOException {
+        return tabInfo(info, ChannelTabs.SHORTS);
+    }
+
+    public static ChannelTabInfo livestreamsTabInfo(ChannelInfo info) throws ExtractionException, IOException {
+        return tabInfo(info, ChannelTabs.LIVESTREAMS);
+    }
+
+    private static ChannelTabInfo tabInfo(ChannelInfo info, String tabId) throws ExtractionException, IOException {
+        var tab = info.getTabs()
                 .stream()
-                .filter(tab -> tab.getContentFilters().contains(ChannelTabs.VIDEOS))
+                .filter(t -> t.getContentFilters().contains(tabId))
                 .findFirst();
-        return preloadedVideosTab.isPresent() ? ChannelTabInfo.getInfo(YOUTUBE_SERVICE, preloadedVideosTab.get()) : null;
+        return tab.isPresent() ? ChannelTabInfo.getInfo(YOUTUBE_SERVICE, tab.get()) : null;
+    }
+
+    public static void refreshChannelTab(ChannelInfo info, ChannelTabInfo tabInfo) {
+        if (tabInfo == null) return;
+        Multithreading.runAsync(() -> federateChannelVideos(tabInfo));
+        updateChannelVideos(info, tabInfo);
     }
 
     public static void federateChannelVideos(ChannelTabInfo tabInfo) {
